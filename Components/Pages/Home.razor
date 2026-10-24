@@ -1,0 +1,303 @@
+@page "/blazor"
+@using System.Text.Json
+@inject ClaudeService ClaudeService
+@inject ILogger<Home> Logger
+
+<PageTitle>Wanderlust | Find your somewhere</PageTitle>
+
+<header class="topbar">
+    <a class="wordmark" href="/" aria-label="Wanderlust home">wander<span>lust</span><i>.</i></a>
+    <nav class="top-nav" aria-label="Main navigation">
+        <a class="nav-active" href="#discover">Discover</a>
+        <a href="#inspiration">Inspiration</a>
+    </nav>
+    <button class="saved-link @(ShowingShortlist ? "showing-shortlist" : "")" type="button" aria-pressed="@ShowingShortlist" @onclick="ToggleShortlist">
+        <span aria-hidden="true">♡</span> @(ShowingShortlist ? "All places" : $"Your shortlist · {Shortlist.Count}")
+    </button>
+</header>
+
+<main id="discover">
+    <section class="intro">
+        <div class="intro-copy">
+            <p class="eyebrow"><span class="eyebrow-mark"></span> A little further, a little deeper</p>
+            <h1>Find your<br /><em>somewhere.</em></h1>
+            <p class="intro-lede">Good trips start with a feeling. Follow yours to a place worth getting lost in.</p>
+        </div>
+        <div class="intro-aside" aria-label="Travel note">
+            <span class="aside-index">FIELD NOTE 01</span>
+            <p>Take the long way.<br />Stay for one more day.</p>
+            <span class="aside-rule"></span>
+            <span class="aside-caption">Curated for curious travellers</span>
+        </div>
+    </section>
+
+    <section class="search-panel" aria-label="Find a destination">
+        <label class="search-label" for="destination-search">I want to go somewhere...</label>
+        <div class="search-row">
+            <span class="search-symbol" aria-hidden="true">⌕</span>
+            <input id="destination-search" class="search-input" @bind="SearchText" @bind:event="oninput" placeholder="Try Kyoto, coast, or a slower pace" autocomplete="off" />
+            @if (!string.IsNullOrWhiteSpace(SearchText))
+            {
+                <button class="clear-search" type="button" title="Clear search" aria-label="Clear search" @onclick="ClearSearch">×</button>
+            }
+        </div>
+        <span class="search-hint">Start with a place, a mood, or a reason to go.</span>
+    </section>
+
+    <section class="discovery-section" aria-labelledby="destinations-heading">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">The considered list</p>
+                <h2 id="destinations-heading">Places with a pulse</h2>
+            </div>
+            <span class="result-count">@FilteredDestinations.Count() places</span>
+        </div>
+
+        <div class="interest-filters" aria-label="Filter by interest">
+            @foreach (var interest in Interests)
+            {
+                <button type="button" class="interest-filter @(SelectedInterests.Contains(interest.Key) ? "selected" : "")" aria-pressed="@SelectedInterests.Contains(interest.Key)" @onclick="() => ToggleInterest(interest.Key)">
+                    <span aria-hidden="true">@interest.Icon</span> @interest.Label
+                </button>
+            }
+            @if (SelectedInterests.Count > 0)
+            {
+                <button type="button" class="reset-filters" @onclick="ClearFilters">Reset</button>
+            }
+        </div>
+
+        @if (FilteredDestinations.Any())
+        {
+            <div class="destination-grid">
+                @foreach (var destination in FilteredDestinations)
+                {
+                    <article class="destination-card">
+                        <button class="destination-image" type="button" style="--destination-image: url('@destination.ImageUrl')" aria-label="Explore @destination.Name" @onclick="() => SelectDestination(destination)">
+                            <span class="image-index">@destination.Index</span>
+                            <span class="image-arrow" aria-hidden="true">↗</span>
+                            <span class="image-country">@destination.Country</span>
+                        </button>
+                        <div class="destination-content">
+                            <div class="destination-title-row">
+                                <div>
+                                    <p class="destination-region">@destination.Region</p>
+                                    <h3>@destination.Name</h3>
+                                </div>
+                                <div class="title-actions">
+                                    <span class="destination-rating" title="Traveller rating">★ @destination.Rating</span>
+                                    <button class="save-destination @(Shortlist.Contains(destination.Name) ? "saved" : "")" type="button" aria-label="@(Shortlist.Contains(destination.Name) ? $"Remove {destination.Name} from shortlist" : $"Save {destination.Name} to shortlist")" aria-pressed="@Shortlist.Contains(destination.Name)" @onclick="() => ToggleSaved(destination.Name)">
+                                        @(Shortlist.Contains(destination.Name) ? "♥" : "♡")
+                                    </button>
+                                </div>
+                            </div>
+                            <p class="destination-description">@destination.Description</p>
+                            <div class="destination-footer">
+                                <div class="destination-tags">
+                                    @foreach (var tag in destination.Tags.Take(2))
+                                    {
+                                        <span>@tag</span>
+                                    }
+                                </div>
+                                <button class="text-action" type="button" @onclick="() => SelectDestination(destination)">Explore <span aria-hidden="true">→</span></button>
+                            </div>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="empty-state">
+                <span aria-hidden="true">◎</span>
+                <h3>@(ShowingShortlist ? "Your shortlist is still open." : "No places on this path yet.")</h3>
+                <p>@(ShowingShortlist ? "Save a place to keep it close." : "Try another search or clear a filter.")</p>
+                <button type="button" class="text-action" @onclick="ClearFilters">Show every place <span aria-hidden="true">→</span></button>
+            </div>
+        }
+    </section>
+
+    <section id="inspiration" class="closing-note">
+        <span class="closing-mark" aria-hidden="true">✳</span>
+        <p>Somewhere out there is a morning<br />you haven't had yet.</p>
+        <span class="closing-credit">WANDERLUST · MADE FOR THE WAY THERE</span>
+    </section>
+</main>
+
+@if (SelectedDestination is not null)
+{
+    <div class="dialog-backdrop" role="presentation" @onclick="CloseDestination">
+        <section class="destination-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title" @onclick:stopPropagation="true">
+            <button type="button" class="dialog-close" aria-label="Close destination details" @onclick="CloseDestination">×</button>
+            <div class="dialog-image" style="--destination-image: url('@SelectedDestination.ImageUrl')">
+                <span>@SelectedDestination.Country</span>
+            </div>
+            <div class="dialog-body">
+                <p class="eyebrow">@SelectedDestination.Region · @SelectedDestination.Country</p>
+                <h2 id="dialog-title">A few days in <em>@SelectedDestination.Name</em></h2>
+                <p class="dialog-description">@SelectedDestination.LongDescription</p>
+                <div class="dialog-tags">
+                    @foreach (var tag in SelectedDestination.Tags)
+                    {
+                        <span>@tag</span>
+                    }
+                </div>
+                <button type="button" class="plan-button" disabled="@IsGenerating" @onclick="GeneratePlan">
+                    @if (IsGenerating)
+                    {
+                        <span class="button-spinner"></span><span>Finding your rhythm...</span>
+                    }
+                    else
+                    {
+                        <span>✳</span><span>Shape a 3-day itinerary</span><span class="button-arrow">→</span>
+                    }
+                </button>
+                @if (!string.IsNullOrWhiteSpace(PlanError))
+                {
+                    <p class="plan-error" role="alert">@PlanError</p>
+                }
+                @if (!string.IsNullOrWhiteSpace(PlanText))
+                {
+                    <div class="plan-result" aria-live="polite">
+                        <p class="eyebrow">A first-draft itinerary</p>
+                        <pre>@PlanText</pre>
+                    </div>
+                }
+            </div>
+        </section>
+    </div>
+}
+
+@code {
+    private string SearchText { get; set; } = string.Empty;
+    private HashSet<string> SelectedInterests { get; } = new(StringComparer.OrdinalIgnoreCase);
+    private Destination? SelectedDestination { get; set; }
+    private bool IsGenerating { get; set; }
+    private string? PlanText { get; set; }
+    private string? PlanError { get; set; }
+    private HashSet<string> Shortlist { get; } = new(StringComparer.OrdinalIgnoreCase);
+    private bool ShowingShortlist { get; set; }
+
+    private static readonly Interest[] Interests =
+    [
+        new("culture", "Culture", "▧"),
+        new("food", "Food", "◒"),
+        new("nature", "Nature", "❋"),
+        new("art", "Art & design", "◩"),
+        new("history", "History", "⌂"),
+        new("slow", "Slow travel", "◷")
+    ];
+
+    private static readonly Destination[] Destinations =
+    [
+        new("01", "Kyoto", "Japan", "East Asia", "A quieter rhythm beneath cedar forests, lantern-lit lanes and temple roofs.", "Let the day begin before the city wakes. Walk the moss paths, linger over a market lunch, and leave room for an unplanned turn.", "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1100&q=85", 4.9, ["culture", "food", "nature", "history", "slow"]),
+        new("02", "Lisbon", "Portugal", "Southern Europe", "Salt air, tiled facades and long lunches on streets that climb toward the light.", "Follow the tram lines uphill, duck into a tiny tasca, then watch the Tagus turn gold from a miradouro as the evening settles in.", "https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=1100&q=85", 4.8, ["culture", "food", "art", "history", "slow"]),
+        new("03", "Marrakech", "Morocco", "North Africa", "A city of courtyards, spice-scented souks and quiet gardens behind carved doors.", "Move between the medina's bright textures and the stillness of a riad. Make time for mint tea, a hammam, and the call to prayer at dusk.", "https://images.unsplash.com/photo-1597212618440-806262de4f6b?auto=format&fit=crop&w=1100&q=85", 4.8, ["culture", "food", "art", "history"]),
+        new("04", "Oaxaca", "Mexico", "Central America", "A generous table, vivid craft traditions and mountain air just beyond the city.", "Taste your way through a market morning, visit a family-run weaving studio, and let the afternoon stretch beneath the jacarandas.", "https://images.unsplash.com/photo-1512813195386-6cf811ad3542?auto=format&fit=crop&w=1100&q=85", 4.9, ["culture", "food", "nature", "art", "history"]),
+        new("05", "Copenhagen", "Denmark", "Northern Europe", "A waterfront city best explored slowly, by bicycle and by appetite.", "Take the harbour path without a strict plan. Pause for a cardamom bun, discover a design shop, and end the day around a shared table.", "https://images.unsplash.com/photo-1513622470522-26c3c8a854bc?auto=format&fit=crop&w=1100&q=85", 4.7, ["food", "nature", "art", "slow"]),
+        new("06", "Ubud", "Indonesia", "Southeast Asia", "Green rice terraces, small temples and the soft hush of the island's interior.", "Start with a walk through the paddies, take a long lunch under the palms, then give the afternoon to a gallery or a restorative pause.", "https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=1100&q=85", 4.8, ["culture", "nature", "art", "slow"])
+    ];
+
+    private IEnumerable<Destination> FilteredDestinations => Destinations.Where(destination =>
+        (string.IsNullOrWhiteSpace(SearchText) ||
+            destination.Name.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
+            destination.Country.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
+            destination.Region.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
+            destination.Description.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
+            destination.Tags.Any(tag => tag.Contains(SearchText, StringComparison.OrdinalIgnoreCase))) &&
+        (SelectedInterests.Count == 0 || SelectedInterests.Any(destination.Tags.Contains)) &&
+        (!ShowingShortlist || Shortlist.Contains(destination.Name)));
+
+    private void ToggleInterest(string key)
+    {
+        if (!SelectedInterests.Add(key))
+        {
+            SelectedInterests.Remove(key);
+        }
+    }
+
+    private void ClearSearch() => SearchText = string.Empty;
+
+    private void ClearFilters()
+    {
+        SearchText = string.Empty;
+        SelectedInterests.Clear();
+        ShowingShortlist = false;
+    }
+
+    private void ToggleShortlist() => ShowingShortlist = !ShowingShortlist;
+
+    private void ToggleSaved(string destinationName)
+    {
+        if (!Shortlist.Add(destinationName))
+        {
+            Shortlist.Remove(destinationName);
+        }
+    }
+
+    private void SelectDestination(Destination destination)
+    {
+        SelectedDestination = destination;
+        PlanText = null;
+        PlanError = null;
+    }
+
+    private void CloseDestination() => SelectedDestination = null;
+
+    private async Task GeneratePlan()
+    {
+        if (SelectedDestination is not { } destination || IsGenerating)
+        {
+            return;
+        }
+
+        IsGenerating = true;
+        PlanError = null;
+        PlanText = null;
+
+        var prompt = $"Create a practical, delightful 3-day itinerary for {destination.Name}, {destination.Country}. " +
+            "Write in Markdown with one heading per day, a morning, afternoon and evening plan, and a short local note for each day. " +
+            "Use specific, well-known places; never invent opening hours, prices, or transport details. Keep it under 500 words.";
+        var request = JsonSerializer.Serialize(new
+        {
+            max_tokens = 1200,
+            system = "You are a thoughtful travel planner. Be specific, realistic, and concise. If uncertain about a detail, say so rather than inventing it.",
+            messages = new[] { new { role = "user", content = prompt } }
+        });
+
+        try
+        {
+            var (statusCode, json) = await ClaudeService.SendMessageAsync(request);
+            using var response = JsonDocument.Parse(json);
+
+            if (statusCode is < 200 or >= 300)
+            {
+                PlanError = response.RootElement.TryGetProperty("error", out var error) && error.TryGetProperty("message", out var message)
+                    ? message.GetString()
+                    : "The itinerary service could not complete this request.";
+                return;
+            }
+
+            PlanText = response.RootElement.GetProperty("content").EnumerateArray()
+                .Where(block => block.TryGetProperty("type", out var type) && type.GetString() == "text")
+                .Select(block => block.GetProperty("text").GetString())
+                .FirstOrDefault(text => !string.IsNullOrWhiteSpace(text));
+            PlanError = PlanText is null ? "The itinerary service returned no travel plan." : null;
+        }
+        catch (OperationCanceledException)
+        {
+            PlanError = "The request took too long. Please try again.";
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Could not create itinerary for {Destination}", destination.Name);
+            PlanError = "We couldn't create that itinerary right now. Please try again.";
+        }
+        finally
+        {
+            IsGenerating = false;
+        }
+    }
+
+    private sealed record Interest(string Key, string Label, string Icon);
+    private sealed record Destination(string Index, string Name, string Country, string Region, string Description, string LongDescription, string ImageUrl, double Rating, string[] Tags);
+}
