@@ -15,6 +15,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddCors(options => options.AddPolicy("GitHubPages", policy =>
+    policy.WithOrigins("https://vedantsomani08-cmyk.github.io")
+        .AllowAnyHeader()
+        .AllowAnyMethod()));
+
 // Register our ClaudeService so it can be injected into endpoints.
 // AddHttpClient gives the service a ready-to-use HttpClient.
 builder.Services.AddHttpClient<ClaudeService>(client =>
@@ -30,6 +35,7 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/error");
 }
 
+app.UseCors("GitHubPages");
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseAntiforgery();

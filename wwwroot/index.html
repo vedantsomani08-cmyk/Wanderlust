@@ -1567,6 +1567,7 @@ h1,h2,h3{font-family:'Fraunces',serif;font-weight:400}
 
 <script>
 // ─── CONSTANTS ───────────────────────────────────────────────────
+const API_BASE_URL = 'https://wanderlust-dfgchfc5e7gvdpbv.centralindia-01.azurewebsites.net';
 const EXP = {
   0:{l:'Free',    k:'f',c:'#4caf72',d:1},
   1:{l:'Budget',  k:'1',c:'#5ba3d9',d:2},
@@ -5899,7 +5900,7 @@ Return ONLY the JSON array starting with [ and ending with ]. No other text.`;
 
 async function callAnthropicAPI(systemPrompt, userPrompt) {
   try {
-    const resp = await fetch('/api/claude', {
+    const resp = await fetch(`${API_BASE_URL}/api/claude`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -12052,7 +12053,7 @@ async function fillPretripGuide(city, country, budgetLevel, days, diet, itinerar
   }
 
   try {
-    var r = await fetch('/api/claude', {
+    var r = await fetch(`${API_BASE_URL}/api/claude`, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:4000, system:sys, messages:[{role:'user',content:usr}] })
     });

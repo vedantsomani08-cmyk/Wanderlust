@@ -104,13 +104,13 @@ The script publishes a Release build, packages it, deploys to the existing Web A
 
 Use `.\deploy-to-azure.ps1 -BuildOnly` to create and retain a ZIP package without requiring Azure CLI login.
 
-### Host source on GitHub and deploy on push
+### GitHub source, Pages frontend, and Azure backend
 
-GitHub Pages cannot host this ASP.NET Core backend. Use a GitHub repository for the source; the included Actions workflow deploys to Azure whenever `main` is updated.
+The repository is public at `https://github.com/vedantsomani08-cmyk/Wanderlust`. GitHub Pages serves the original static frontend from `wwwroot`; Azure continues hosting the ASP.NET Core API. The frontend calls the Azure API cross-origin, and `Program.cs` allows only this GitHub Pages origin.
 
-1. Create a GitHub repository and push this project to its `main` branch. Install Git for Windows if needed; do not commit API keys.
-2. In Azure Cloud Shell, create an Entra app registration and federated credential for `repo:OWNER/REPOSITORY:ref:refs/heads/main`, then assign it the **Website Contributor** role scoped to the Wanderlust Web App. This requires permission to create app registrations and role assignments in the Azure tenant.
-3. Add these repository **variables** under GitHub **Settings → Secrets and variables → Actions → Variables**:
+The `Deploy frontend to GitHub Pages` workflow publishes `wwwroot` on pushes to `main`. In repository **Settings → Pages**, set the build and deployment source to **GitHub Actions**. The site URL will be `https://vedantsomani08-cmyk.github.io/Wanderlust/` after the workflow succeeds.
+
+The `Deploy to Azure App Service` workflow builds and deploys the backend on pushes to `main`. Azure OIDC is configured for this repository and branch. Its repository **Actions variables** are:
 
    | Variable | Value |
    |---|---|
@@ -118,7 +118,7 @@ GitHub Pages cannot host this ASP.NET Core backend. Use a GitHub repository for 
    | `AZURE_TENANT_ID` | Azure tenant ID |
    | `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
 
-The workflow uses OIDC, so no publish profile or long-lived Azure password is stored in GitHub. Push to `main` or run the workflow manually from the **Actions** tab.
+The Azure workflow uses OIDC, so no publish profile or long-lived Azure password is stored in GitHub. Push to `main` or run either workflow manually from the **Actions** tab.
 
 Add `Anthropic__ApiKey` in the App Service **Environment variables** settings for AI features. Never put the key in GitHub. The Free F1 plan has limited CPU and memory, no SLA, and may unload the app while idle; Anthropic usage is billed separately.
 
