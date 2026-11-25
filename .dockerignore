@@ -3,3 +3,4 @@
 *.pem
 *.csr
 **/hotel api/
+*.pfx.b64
