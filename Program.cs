@@ -56,12 +56,16 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseAntiforgery();
 
-app.MapGet("/api/health", () => Results.Ok(new
+app.MapGet("/api/hotelbeds/search-test", async (HotelbedsService hotelbeds) =>
 {
-    status = "ok",
-    app = "Wanderlust",
-    serverTime = DateTime.Now
-}));
+    var (statusCode, body) = await hotelbeds.SearchHotelsAsync(
+        new DateOnly(2026, 12, 3),
+        new DateOnly(2026, 12, 10),
+        1
+    );
+
+    return Results.Content(body, "application/json", statusCode: statusCode);
+});
 
 app.MapPost("/api/claude", async (HttpRequest request, ClaudeService claude) =>
 {
