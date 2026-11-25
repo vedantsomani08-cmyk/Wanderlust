@@ -15,9 +15,9 @@ public class HotelbedsService(HttpClient client, IConfiguration config)
             ?? throw new InvalidOperationException("Hotelbeds API secret missing.");
 
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
-
         var input = Encoding.UTF8.GetBytes(apiKey + secret + timestamp);
-        var signature = Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant();
+        var signature = Convert.ToHexString(
+            SHA256.HashData(input)).ToLowerInvariant();
 
         using var request = new HttpRequestMessage(
             HttpMethod.Get, "hotel-api/1.0/status");
