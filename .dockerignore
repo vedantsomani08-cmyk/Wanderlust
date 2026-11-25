@@ -1,0 +1,5 @@
+*.pfx
+*.key
+*.pem
+*.csr
+**/hotel api/
