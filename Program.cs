@@ -21,7 +21,7 @@ builder.Services.AddHttpClient<ClaudeService>(client =>
 // Hotelbeds mTLS client
 builder.Services.AddHttpClient<HotelbedsService>(client =>
 {
-    client.BaseAddress = new Uri("https://api-mtls.test.hotelbeds.com/");
+    client.BaseAddress = new Uri("https://api.test.hotelbeds.com/");
     client.Timeout = TimeSpan.FromSeconds(30);
 })
 .ConfigurePrimaryHttpMessageHandler(() =>
