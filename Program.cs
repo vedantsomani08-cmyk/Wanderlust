@@ -1,12 +1,5 @@
-// ============================================================
-//  Wanderlust - ASP.NET Core web app (C#)
-//  1. Serves the website from the wwwroot folder (index.html)
-//  2. Provides a small C# Web API:
-//       GET  /api/health  -> checks the server is running
-//       POST /api/claude  -> forwards AI requests to Anthropic,
-//                            adding the secret API key on the server
-// ============================================================
 
+using System.Security.Cryptography.X509Certificates;
 using Wanderlust.Services;
 using Wanderlust.Components;
 
@@ -20,16 +13,39 @@ builder.Services.AddCors(options => options.AddPolicy("GitHubPages", policy =>
         .AllowAnyHeader()
         .AllowAnyMethod()));
 
-// Register our ClaudeService so it can be injected into endpoints.
-// AddHttpClient gives the service a ready-to-use HttpClient.
 builder.Services.AddHttpClient<ClaudeService>(client =>
 {
-    client.Timeout = TimeSpan.FromMinutes(3); // AI answers can take a while
+    client.Timeout = TimeSpan.FromMinutes(3);
+});
+
+// Hotelbeds mTLS client
+builder.Services.AddHttpClient<HotelbedsService>(client =>
+{
+    client.BaseAddress = new Uri("https://api-mtls.test.hotelbeds.com/");
+    client.Timeout = TimeSpan.FromSeconds(30);
+})
+.ConfigurePrimaryHttpMessageHandler(() =>
+{
+    var path = "/etc/secrets/hotelbeds-client.pfx.b64";
+
+    var encoded = File.ReadAllText(path);
+    var pfxBytes = Convert.FromBase64String(encoded);
+
+    var password = builder.Configuration["HOTELBEDS_CERTIFICATE_PASSWORD"]
+        ?? throw new InvalidOperationException("Hotelbeds certificate password missing.");
+
+    var certificate = X509CertificateLoader.LoadPkcs12(
+        pfxBytes, password, X509KeyStorageFlags.EphemeralKeySet);
+
+    var handler = new HttpClientHandler();
+    handler.ClientCertificateOptions = ClientCertificateOption.Manual;
+    handler.ClientCertificates.Add(certificate);
+
+    return handler;
 });
 
 var app = builder.Build();
 
-// Show detailed errors only while developing
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/error");
@@ -40,8 +56,6 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseAntiforgery();
 
-// ---------- API endpoints ----------
-
 app.MapGet("/api/health", () => Results.Ok(new
 {
     status = "ok",
@@ -51,13 +65,17 @@ app.MapGet("/api/health", () => Results.Ok(new
 
 app.MapPost("/api/claude", async (HttpRequest request, ClaudeService claude) =>
 {
-    // Read the JSON the browser sent
     using var reader = new StreamReader(request.Body);
     string body = await reader.ReadToEndAsync();
 
-    // Let the service call Anthropic and give us the result
     var (statusCode, json) = await claude.SendMessageAsync(body);
     return Results.Content(json, "application/json", statusCode: statusCode);
+});
+
+app.MapGet("/api/hotelbeds/status", async (HotelbedsService hotelbeds) =>
+{
+    var (statusCode, body) = await hotelbeds.CheckStatusAsync();
+    return Results.Content(body, "application/json", statusCode: statusCode);
 });
 
 app.MapGet("/error", () => Results.Problem("Something went wrong on the server."));
