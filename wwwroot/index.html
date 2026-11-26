@@ -8187,7 +8187,78 @@ function buildHotelsTab(container, p) {
   };
 
   render('all', activeArea);
+
+  // Load real Hotelbeds results for our New York test
+  if (city === 'New York') {
+    const grid = container.querySelector('#hpGrid');
+
+    if (grid) {
+      grid.innerHTML = '<p>Loading live hotels from Hotelbeds...</p>';
+
+      fetch('https://wanderlust-xwqk.onrender.com/api/hotelbeds/search-test')
+        .then(async response => {
+          const data = await response.json();
+          if (!response.ok) throw new Error('Hotel search failed');
+
+          const hotels = data.hotels?.hotels || [];
+          grid.innerHTML = '';
+
+          if (!hotels.length) {
+            grid.textContent = 'No hotels available for these dates.';
+            return;
+          }
+
+          hotels.forEach(hotel => {
+            const rates = (hotel.rooms || []).flatMap(room =>
+              (room.rates || []).map(rate => ({ room, rate }))
+            );
+
+            const best = rates
+              .filter(x => x.rate.rateType === 'BOOKABLE')
+              .sort((a, b) => Number(a.rate.net) - Number(b.rate.net))[0];
+
+            if (!best) return;
+
+            const card = document.createElement('div');
+            card.className = 'fh-card';
+
+            const name = document.createElement('h3');
+            name.className = 'fh-name';
+            name.textContent = hotel.name;
+
+            const location = document.createElement('p');
+            location.className = 'fh-loc';
+            location.textContent =
+              `${hotel.categoryName || ''} · ${hotel.zoneName || 'New York'}`;
+
+            const room = document.createElement('p');
+            room.className = 'fh-desc';
+            room.textContent = best.room.name;
+
+            const price = document.createElement('p');
+            price.className = 'fh-price';
+            price.textContent =
+              `USD ${Number(best.rate.net).toLocaleString('en-US')} total for 7 nights`;
+
+            const map = document.createElement('button');
+            map.className = 'fh-map';
+            map.textContent = '🗺️ Map';
+            map.onclick = () => window.open(
+              `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hotel.name + ', New York')}`,
+              '_blank'
+            );
+
+            card.append(name, location, room, price, map);
+            grid.appendChild(card);
+          });
+        })
+        .catch(error => {
+          grid.textContent = 'Hotelbeds search failed: ' + error.message;
+        });
+    }
+  }
 }
+
 
 // ─── PLACEHOLDER HOTEL GENERATOR ─────────────────────────────────
 function generatePlaceholderHotels(city, p, areaId) {
