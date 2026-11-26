@@ -10733,54 +10733,73 @@ function toggleHotels() {
   }
 }
 
-function renderHotels() {
+
+async function renderHotels() {
   const city = curP ? curP.city : '';
   document.getElementById('hotelCityName').textContent = city;
-  const container = document.getElementById('hotelCards');
-  const list = HOTELS[city];
 
-  if(list && list.length) {
+  const container = document.getElementById('hotelCards');
+  container.innerHTML = '<p style="color:var(--t2)">Loading live hotels from Hotelbeds...</p>';
+
+  try {
+    const response = await fetch(
+      'https://wanderlust-xwqk.onrender.com/api/hotelbeds/search-test'
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Hotel search failed');
+    }
+
+    const hotels = data.hotels?.hotels || [];
+
+    if (!hotels.length) {
+      container.textContent = 'No hotels found for these dates.';
+      return;
+    }
+
     container.innerHTML = '';
-    list.forEach((h, i) => {
-      const [name, emoji, stars, category, price, badge, desc, lat, lng] = h;
-      const starStr = '★'.repeat(stars) + '☆'.repeat(5-stars);
-      const badgeCls = HOTEL_BADGE[badge] || 'hb-moderate';
+
+    hotels.forEach((hotel, index) => {
+      const room = hotel.rooms?.[0];
+      const rate = room?.rates?.[0];
+
       const card = document.createElement('div');
       card.className = 'hotel-card';
-      card.style.animationDelay = (i * 0.07) + 's';
       card.style.animation = 'fadeUp .3s ease-out both';
-      card.innerHTML = `
-        <div class="hotel-emoji">${emoji}</div>
-        <div class="hotel-info">
-          <div class="hotel-name">${name}</div>
-          <div class="hotel-meta">
-            <span class="hotel-stars">${starStr}</span>
-            <span class="hotel-cat">${category}</span>
-            <span class="hotel-badge ${badgeCls}">${badge}</span>
-          </div>
-          <div class="hotel-desc">${desc}</div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex-shrink:0">
-          <div class="hotel-price">${price}<span style="font-size:.65rem;color:var(--t3);font-weight:400">/night</span></div>
-          <button class="hotel-book-btn" onclick="searchHotel('${name.replace(/'/g,"\\'")}','${city}')">Search →</button>
-        </div>`;
+      card.style.animationDelay = (index * 0.07) + 's';
+
+      const name = document.createElement('div');
+      name.className = 'hotel-name';
+      name.textContent = hotel.name;
+
+      const location = document.createElement('div');
+      location.className = 'hotel-meta';
+      location.textContent =
+        `${hotel.categoryName || ''} · ${hotel.zoneName || hotel.destinationName || city}`;
+
+      const roomName = document.createElement('div');
+      roomName.className = 'hotel-desc';
+      roomName.textContent = room?.name || 'Room details unavailable';
+
+      const price = document.createElement('div');
+      price.className = 'hotel-price';
+      price.textContent = rate
+        ? `API net total: ${rate.net}`
+        : 'Price unavailable';
+
+      const board = document.createElement('div');
+      board.className = 'hotel-desc';
+      board.textContent = rate?.boardName || '';
+
+      card.append(name, location, roomName, price, board);
       container.appendChild(card);
     });
-  } else {
-    // Fallback: show search links for popular booking sites
-    container.innerHTML = `
-      <p style="font-size:.83rem;color:var(--t2);margin-bottom:.85rem;line-height:1.6">
-        Find the best hotels in <strong style="color:var(--t)">${city}</strong> on these trusted booking platforms:
-      </p>
-      ${[
-        ['🌐 Booking.com', `https://www.booking.com/search.html?ss=${encodeURIComponent(city)}`],
-        ['🏨 Hotels.com',  `https://www.hotels.com/search.do?q-destination=${encodeURIComponent(city)}`],
-        ['✈️ Agoda',       `https://www.agoda.com/search?city=${encodeURIComponent(city)}`],
-        ['🌍 Hostelworld', `https://www.hostelworld.com/search?search_keywords=${encodeURIComponent(city)}`],
-      ].map(([label, url]) => `
-        <a href="${url}" target="_blank" style="display:flex;align-items:center;gap:10px;padding:.85rem 1rem;background:var(--s2);border:1px solid var(--b);border-radius:10px;color:var(--t);text-decoration:none;font-size:.84rem;font-weight:500;transition:border-color .15s;margin-bottom:8px" onmouseover="this.style.borderColor='var(--clay)'" onmouseout="this.style.borderColor='var(--b)'">
-          ${label} <span style="margin-left:auto;font-size:.72rem;color:var(--t3)">Search hotels →</span>
-        </a>`).join('')}`;
+
+  } catch (error) {
+    container.textContent =
+      'Could not load hotels: ' + error.message;
   }
 }
 
