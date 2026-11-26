@@ -18,6 +18,12 @@ builder.Services.AddHttpClient<ClaudeService>(client =>
     client.Timeout = TimeSpan.FromMinutes(3);
 });
 
+builder.Services.AddHttpClient("Geocoding", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(15);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("WanderlustTravelPlanner/1.0");
+});
+
 // Hotelbeds mTLS client
 builder.Services.AddHttpClient<HotelbedsService>(client =>
 {
@@ -56,13 +62,29 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseAntiforgery();
 
-app.MapGet("/api/hotelbeds/search-test", async (HotelbedsService hotelbeds) =>
+app.MapGet("/api/hotelbeds/search", async (HttpRequest request, HotelbedsService hotelbeds) =>
 {
+    var destination = request.Query["destination"].ToString().Trim();
+    var checkInText = request.Query["checkIn"].ToString();
+    var checkOutText = request.Query["checkOut"].ToString();
+    var adultsText = request.Query["adults"].ToString();
+
+    if (string.IsNullOrWhiteSpace(destination) || destination.Length > 100)
+        return Results.BadRequest(new { error = "Enter a destination city." });
+
+    if (!DateOnly.TryParse(checkInText, out var checkIn) ||
+        !DateOnly.TryParse(checkOutText, out var checkOut))
+        return Results.BadRequest(new { error = "Choose valid check-in and check-out dates." });
+
+    if (checkIn < DateOnly.FromDateTime(DateTime.UtcNow) ||
+        checkOut <= checkIn || checkOut.DayNumber - checkIn.DayNumber > 30)
+        return Results.BadRequest(new { error = "Choose future dates for a stay of 1 to 30 nights." });
+
+    if (!int.TryParse(adultsText, out var adults) || adults < 1 || adults > 6)
+        return Results.BadRequest(new { error = "Choose between 1 and 6 adults." });
+
     var (statusCode, body) = await hotelbeds.SearchHotelsAsync(
-        new DateOnly(2026, 12, 3),
-        new DateOnly(2026, 12, 10),
-        1
-    );
+        destination, checkIn, checkOut, adults);
 
     return Results.Content(body, "application/json", statusCode: statusCode);
 });
