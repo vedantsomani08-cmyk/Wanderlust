@@ -2,10 +2,14 @@ using System.Globalization;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace Wanderlust.Services;
 
-public class HotelbedsService(HttpClient client, IConfiguration config)
+public class HotelbedsService(
+    HttpClient client,
+    IConfiguration config,
+    IHttpClientFactory httpClientFactory)
 {
     private HttpRequestMessage CreateRequest(HttpMethod method, string path)
     {
@@ -43,10 +47,42 @@ public class HotelbedsService(HttpClient client, IConfiguration config)
     }
 
     public async Task<(int StatusCode, string Body)> SearchHotelsAsync(
+        string destination,
         DateOnly checkIn,
         DateOnly checkOut,
         int adults)
     {
+        var geocoder = httpClientFactory.CreateClient("Geocoding");
+        var geocodeUrl =
+            "https://geocoding-api.open-meteo.com/v1/search?name=" +
+            Uri.EscapeDataString(destination) +
+            "&count=1&language=en&format=json";
+
+        using var geoResponse = await geocoder.GetAsync(geocodeUrl);
+        if (!geoResponse.IsSuccessStatusCode)
+        {
+            return (502, JsonSerializer.Serialize(new
+            {
+                error = "Could not look up that destination. Please try another city."
+            }));
+        }
+
+        using var geoJson = JsonDocument.Parse(
+            await geoResponse.Content.ReadAsStringAsync());
+
+        if (!geoJson.RootElement.TryGetProperty("results", out var results) ||
+            results.GetArrayLength() == 0)
+        {
+            return (404, JsonSerializer.Serialize(new
+            {
+                error = $"We couldn't find the destination '{destination}'. Try a city name."
+            }));
+        }
+
+        var place = results[0];
+        var latitude = place.GetProperty("latitude").GetDouble();
+        var longitude = place.GetProperty("longitude").GetDouble();
+
         var payload = new
         {
             stay = new
@@ -65,8 +101,8 @@ public class HotelbedsService(HttpClient client, IConfiguration config)
             },
             geolocation = new
             {
-                latitude = 40.7580,
-                longitude = -73.9855,
+                latitude,
+                longitude,
                 radius = 20,
                 unit = "km"
             }
